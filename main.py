@@ -101,43 +101,54 @@ def reload_model(version: Optional[str] = Query(default=None), url: Optional[str
     """
     Recharger dynamiquement le modèle par défaut.
     - Si 'version' est fourni, copie models/{version} → models/esti-rag-ft
-    - Si 'url' est un modèle HuggingFace ou chemin, charge depuis ce chemin (sans copie locale)
+    - Si 'url' est fourni, télécharge l'archive zip et extrait dans models/esti-rag-ft
     """
     global default_model, current_model_path
 
     try:
-        if url:
-            # Cas d'un modèle externe HuggingFace ou distant
-            print(f"🔁 Chargement temporaire depuis URL : {url}")
-            default_model = load_model_by_url(url,version)
-            current_model_path = f"models/{version}"
-            return {"status": "success", "model_path": url}
+        if url and version:
+            print(f"🔁 Téléchargement et extraction depuis URL : {url} dans models/esti-rag-ft")
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                zip_path = os.path.join(tmpdir, "model.zip")
+
+                r = requests.get(url)
+                r.raise_for_status()
+                with open(zip_path, "wb") as f:
+                    f.write(r.content)
+
+                extract_dir = os.path.join(MODELS_DIR, "esti-rag-ft")
+                if os.path.exists(extract_dir):
+                    shutil.rmtree(extract_dir)
+
+                os.makedirs(extract_dir, exist_ok=True)
+                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                    zip_ref.extractall(extract_dir)
+
+            # Charger le nouveau modèle
+            default_model = load_model(extract_dir)
+            current_model_path = extract_dir
+            return {"status": "success", "model_path": extract_dir}
 
         elif version:
             source_path = os.path.join(MODELS_DIR, version)
             if not os.path.exists(source_path):
                 raise FileNotFoundError(f"Modèle {version} introuvable à {source_path}")
 
-            # 🔧 Créer models/ si besoin
-            os.makedirs(MODELS_DIR, exist_ok=True)
-
-            # Supprimer l'ancien modèle s'il existe
             if os.path.exists(DEFAULT_MODEL_NAME):
                 shutil.rmtree(DEFAULT_MODEL_NAME)
 
-            # Copier le modèle vers le nom standard
             shutil.copytree(src=source_path, dst=DEFAULT_MODEL_NAME)
-
-            # Recharger
             default_model = load_model(DEFAULT_MODEL_NAME)
             current_model_path = DEFAULT_MODEL_NAME
             return {"status": "success", "model_path": DEFAULT_MODEL_NAME}
 
         else:
-            raise ValueError("Il faut fournir 'version' ou 'url'.")
+            raise ValueError("Il faut fournir à la fois 'version' et 'url' pour téléchargement, ou juste 'version'.")
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur rechargement modèle: {str(e)}")
+
 
 @app.get("/status")
 def status():

@@ -5,3 +5,4 @@ models/
 include/
 share/
 __pycache__/
+*.log
