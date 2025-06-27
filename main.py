@@ -6,6 +6,9 @@ from typing import Optional
 import numpy as np
 import os
 import shutil
+import requests
+import zipfile
+import tempfile
 
 # Constantes
 DEVICE = "cuda" if os.environ.get("USE_CUDA", "0") == "1" else "cpu"
@@ -31,9 +34,36 @@ DEFAULT_MODEL_NAME = os.path.join(MODELS_DIR, "esti-rag-ft")
 default_model: SentenceTransformer = None
 current_model_path: str = DEFAULT_MODEL_NAME
 
-def load_model(model_path: str) -> SentenceTransformer:
-    print(f"🧠 Chargement SentenceTransformer depuis : {model_path}")
-    return SentenceTransformer(model_path, device=DEVICE)
+def load_model_by_url(url: str, version: str) -> SentenceTransformer:
+    """
+    Télécharge un modèle zippé depuis une URL, l'extrait dans ./models/{version},
+    puis le charge avec SentenceTransformer.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        zip_path = os.path.join(tmpdir, "model.zip")
+
+        # Téléchargement
+        print(f"⬇️ Téléchargement du modèle depuis {url}")
+        r = requests.get(url)
+        r.raise_for_status()
+        with open(zip_path, "wb") as f:
+            f.write(r.content)
+
+        # Extraction
+        target_dir = os.path.join(MODELS_DIR, version)
+        if os.path.exists(target_dir):
+            shutil.rmtree(target_dir)
+        os.makedirs(target_dir, exist_ok=True)
+
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(target_dir)
+
+        print(f"✅ Modèle extrait dans {target_dir}")
+
+        # Chargement
+        model = SentenceTransformer(target_dir, device=DEVICE)
+        return model
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -79,8 +109,8 @@ def reload_model(version: Optional[str] = Query(default=None), url: Optional[str
         if url:
             # Cas d'un modèle externe HuggingFace ou distant
             print(f"🔁 Chargement temporaire depuis URL : {url}")
-            default_model = load_model(url)
-            current_model_path = url
+            default_model = load_model_by_url(url,version)
+            current_model_path = f"models/{version}"
             return {"status": "success", "model_path": url}
 
         elif version:

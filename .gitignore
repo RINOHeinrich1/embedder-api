@@ -1,6 +1,7 @@
 lib/
 lib64/
 bin/
+models/
 include/
 share/
 __pycache__/
