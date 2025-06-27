@@ -59,8 +59,9 @@ def get_embedding(req: TextRequest):
     try:
         if req.model:
             model = load_model(req.model)
+            embeddings = model.encode(req.texts, convert_to_numpy=True, normalize_embeddings=True)
         else:
-        embeddings = default_model.encode(req.texts, convert_to_numpy=True, normalize_embeddings=True)
+            embeddings = default_model.encode(req.texts, convert_to_numpy=True, normalize_embeddings=True)
         return {"embeddings": embeddings.tolist()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
