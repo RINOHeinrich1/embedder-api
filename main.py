@@ -65,6 +65,9 @@ def load_model_by_url(url: str, version: str) -> SentenceTransformer:
         model = SentenceTransformer(target_dir, device=DEVICE)
         return model
 
+@app.get("/")
+def greet_json():
+    return {"Hello": "World!"}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -188,6 +191,4 @@ def status():
         "model_path": current_model_path
     }
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=7860, reload=False)
+
