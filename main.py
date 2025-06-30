@@ -65,9 +65,6 @@ def load_model_by_url(url: str, version: str) -> SentenceTransformer:
         model = SentenceTransformer(target_dir, device=DEVICE)
         return model
 
-@app.get("/")
-def greet_json():
-    return {"Hello": "World!"}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -87,6 +84,10 @@ app = FastAPI(lifespan=lifespan)
 class TextRequest(BaseModel):
     texts: list[str]
     model: Optional[str] = ""
+
+@app.get("/")
+def greet_json():
+    return {"Hello": "World!"}
 
 @app.post("/embed")
 def get_embedding(req: TextRequest):
